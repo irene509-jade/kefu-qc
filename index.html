@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>客服质检管理系统</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ============================================================
+// 【第一步配置这里】填入你的 Supabase 项目信息
+// 注册后在 Project Settings → API 里找到这两个值
+// ============================================================
+const SUPABASE_URL = 'https://zkbzkyywdeswufpobtuo.supabase.co';       // 例如: https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = 'sb_publishable_Ei7Eo2EPBN-xUcJ3shBEHQ_6X2l8DD3'; // 例如: eyJhbGci...
+
+const _supa = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --primary: #DA291C;
+    --primary-dark: #b02015;
+    --gold: #FFC72C;
+    --bg: #f5f5f5;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --text2: #666;
+    --border: #e0e0e0;
+    --pass: #4CAF50;
+    --warn: #FF9800;
+    --fail: #F44336;
+    --excel: #217346;
+  }
+  body { font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo { font-size: 28px; }
+  .header-title h1 { font-size: 18px; font-weight: 700; }
+  .header-title p { font-size: 12px; opacity: 0.85; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; }
+  .last-update { background: rgba(255,255,255,0.15); padding: 4px 12px; border-radius: 20px; font-size: 12px; }
+  .pass-badge { background: var(--gold); color: #333; padding: 4px 12px; border-radius: 20px; font-weight: 700; font-size: 12px; }
+
+  /* Nav Tabs */
+  .nav { background: white; border-bottom: 1px solid var(--border); padding: 0 24px; display: flex; gap: 0; overflow-x: auto; }
+  .nav-tab { padding: 14px 20px; font-size: 14px; color: var(--text2); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; transition: all 0.2s; font-weight: 500; }
+  .nav-tab:hover { color: var(--primary); }
+  .nav-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 700; }
+
+  /* Content */
+  .content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Stats Cards */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); border-left: 4px solid var(--primary); }
+  .stat-card.green { border-left-color: var(--pass); }
+  .stat-card.orange { border-left-color: var(--warn); }
+  .stat-card.red { border-left-color: var(--fail); }
+  .stat-card.gold { border-left-color: var(--gold); }
+  .stat-label { font-size: 12px; color: var(--text2); margin-bottom: 8px; }
+  .stat-value { font-size: 32px; font-weight: 700; line-height: 1; }
+  .stat-sub { font-size: 12px; color: var(--text2); margin-top: 6px; }
+
+  /* Section */
+  .section { background: var(--card); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .section-title::before { content: ''; width: 4px; height: 16px; background: var(--primary); border-radius: 2px; display: inline-block; }
+
+  /* Filter Bar */
+  .filter-bar { background: var(--card); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .filter-bar input, .filter-bar select { padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; transition: border 0.2s; background: white; min-width: 140px; }
+  .filter-bar input:focus, .filter-bar select:focus { border-color: var(--primary); }
+  .filter-bar label { font-size: 13px; color: var(--text2); }
+  .filter-count { margin-left: auto; font-size: 13px; color: var(--text2); }
+  .btn-clear { padding: 8px 16px; background: #f0f0f0; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; color: var(--text2); transition: all 0.2s; }
+  .btn-clear:hover { background: #e0e0e0; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead { background: #f8f8f8; }
+  th { padding: 12px 14px; text-align: left; font-weight: 600; color: var(--text2); font-size: 12px; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafafa; }
+  tr.bad-review td { background: #fff8f8; }
+  tr.bad-review:hover td { background: #fff0f0; }
+  tr.low-score td { background: #fffdf0; }
+
+  /* Score Badge */
+  .score-badge { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; font-weight: 700; font-size: 15px; color: white; }
+  .score-badge.pass { background: var(--pass); }
+  .score-badge.warn { background: var(--warn); }
+  .score-badge.fail { background: var(--fail); }
+
+  /* Tags */
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin: 2px; }
+  .tag-bad { background: #FFEBEE; color: var(--fail); }
+  .tag-normal { background: #E8F5E9; color: var(--pass); }
+  .tag-dim1 { background: #E8F5E9; color: #2E7D32; }
+  .tag-dim2 { background: #E3F2FD; color: #1565C0; }
+  .tag-dim3 { background: #FFF3E0; color: #E65100; }
+  .tag-dim4 { background: #F3E5F5; color: #6A1B9A; }
+  .tag-dim5 { background: #FFEBEE; color: #B71C1C; }
+  .agent-tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .agent-麦小妖 { background: #FCE4EC; color: #C2185B; }
+  .agent-麦小薇 { background: #E3F2FD; color: #1565C0; }
+  .agent-麦小东 { background: #E8F5E9; color: #2E7D32; }
+  .agent-麦小风 { background: #FFF3E0; color: #E65100; }
+  .agent-麦小淼 { background: #F3E5F5; color: #6A1B9A; }
+
+  /* Script Box */
+  .script-box { background: #f8f9fa; border-left: 3px solid var(--gold); padding: 8px 12px; border-radius: 0 6px 6px 0; font-size: 12px; line-height: 1.6; color: #444; max-width: 320px; white-space: pre-wrap; }
+  .direction-box { font-size: 11px; color: var(--text2); margin-top: 4px; font-style: italic; }
+
+  /* Agent Performance */
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .agent-card { border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .agent-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .agent-avatar { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: white; flex-shrink: 0; }
+  .agent-info h3 { font-size: 15px; font-weight: 700; }
+  .agent-info p { font-size: 12px; color: var(--text2); }
+  .agent-score-big { font-size: 28px; font-weight: 700; }
+  .score-excellent { color: var(--pass); }
+  .score-good { color: #66BB6A; }
+  .score-warn { color: var(--warn); }
+  .score-fail { color: var(--fail); }
+  .agent-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
+  .agent-stat { text-align: center; background: #f8f8f8; padding: 8px; border-radius: 6px; }
+  .agent-stat-val { font-size: 16px; font-weight: 700; }
+  .agent-stat-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .progress-bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+  .level-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+  .level-优秀 { background: #E8F5E9; color: #2E7D32; }
+  .level-良好 { background: #E3F2FD; color: #1565C0; }
+  .level-需改进 { background: #FFF3E0; color: #E65100; }
+  .level-警示 { background: #FFEBEE; color: #B71C1C; }
+
+  /* Chart Container */
+  .chart-container { position: relative; height: 280px; }
+
+  /* Issue Analysis */
+  .issue-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; }
+  .issue-rank { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; flex-shrink: 0; }
+  .issue-rank.top3 { background: var(--gold); color: #333; }
+  .issue-detail h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .issue-detail p { font-size: 12px; color: var(--text2); }
+  .issue-count { margin-left: auto; font-size: 20px; font-weight: 700; color: var(--primary); flex-shrink: 0; }
+  .issue-count small { font-size: 11px; color: var(--text2); }
+
+  /* SOP Page */
+  .sop-section { margin-bottom: 28px; }
+  .sop-title { font-size: 16px; font-weight: 700; color: var(--primary); border-bottom: 2px solid var(--primary); padding-bottom: 8px; margin-bottom: 16px; }
+  .sop-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .sop-table th { background: var(--primary); color: white; padding: 10px 14px; text-align: left; }
+  .sop-table td { padding: 10px 14px; border: 1px solid var(--border); vertical-align: top; }
+  .sop-table tr:nth-child(even) td { background: #fafafa; }
+  .flow-steps { display: flex; flex-wrap: wrap; gap: 0; margin: 12px 0; }
+  .flow-step { display: flex; align-items: center; }
+  .flow-step-box { background: var(--primary); color: white; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .flow-arrow { color: var(--text2); padding: 0 8px; font-size: 18px; }
+  .highlight-box { background: #FFF8E1; border: 1px solid var(--gold); border-radius: 8px; padding: 12px 16px; margin: 10px 0; font-size: 13px; }
+  .highlight-box strong { color: var(--primary-dark); }
+
+  /* Tooltip */
+  .deduction-list { font-size: 12px; }
+  .deduction-item { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+  .deduction-points { color: var(--fail); font-weight: 700; white-space: nowrap; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .content { padding: 12px; }
+    .header { padding: 0 16px; }
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  /* Print */
+  @media print { .nav, .filter-bar, .header-right { display: none; } }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 40px; color: var(--text2); }
+  .empty-icon { font-size: 40px; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🎯</div>
+    <div class="header-title">
+      <h1>客服质检管理系统</h1>
+      <p>多店铺客服质检平台 · 质检周期：每日 · 执行人：AI质检系统</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="last-update">最后更新：<span id="lastUpdateTime">--</span></div>
+    <div class="pass-badge" id="passRateBadge">合格率：--</div>
+  </div>
+</div>
+
+<div class="nav">
+  <div class="nav-tab active" onclick="switchTab('dashboard')">📊 质检概览</div>
+  <div class="nav-tab" onclick="switchTab('detail')">📋 质检明细</div>
+  <div class="nav-tab" onclick="switchTab('agent')">👤 客服绩效</div>
+  <div class="nav-tab" onclick="switchTab('issue')">⚠️ 问题分析</div>
+  <div class="nav-tab" onclick="switchTab('sop')">📄 质检SOP</div>
+  <div class="nav-tab" onclick="switchTab('shopflow')">🏪 店铺流程</div>
+  <div class="nav-tab" onclick="switchTab('perf')">📁 绩效留档</div>
+</div>
+
+<!-- 概览页 -->
+<div class="content">
+<div class="page active" id="page-dashboard">
+  <div class="stats-grid" id="statsGrid"></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="section">
+      <div class="section-header"><div class="section-title">客服得分分布</div></div>
+      <div class="chart-container"><canvas id="agentChart"></canvas></div>
+    </div>
+    <div class="section">
+      <div class="section-header"><div class="section-title">问题类型分布</div></div>
+      <div class="chart-container"><canvas id="issueChart"></canvas></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-header"><div class="section-title">⚠️ 需关注会话（得分低于90分）</div></div>
+    <div id="lowScoreList"></div>
+  </div>
+  <div class="section">
+    <div class="section-header"><div class="section-title">🔴 差评会话（必查）</div></div>
+    <div id="badReviewList"></div>
+  </div>
+</div>
+
+<!-- 质检明细页 -->
+<div class="page" id="page-detail">
+  <div class="filter-bar">
+    <label>搜索：</label>
+    <input type="text" id="searchInput" placeholder="会话ID / 用户名 / 场景..." oninput="applyFilters()">
+    <label>店铺：</label>
+    <select id="shopFilter" onchange="applyFilters()">
+      <option value="">全部店铺</option>
+    </select>
+    <label>客服：</label>
+    <select id="agentFilter" onchange="applyFilters()">
+      <option value="">全部客服</option>
+    </select>
+    <label>日期：</label>
+    <select id="dateFilter" onchange="applyFilters()">
+      <option value="">全部日期</option>
+    </select>
+    <label>评价：</label>
+    <select id="evalFilter" onchange="applyFilters()">
+      <option value="">全部评价</option>
+      <option value="差评">差评</option>
+      <option value="正常">正常</option>
+    </select>
+    <label>得分：</label>
+    <select id="scoreFilter" onchange="applyFilters()">
+      <option value="">全部得分</option>
+      <option value="low">低于85分</option>
+      <option value="mid">85-94分</option>
+      <option value="high">95分以上</option>
+    </select>
+    <button class="btn-clear" onclick="clearFilters()">清除筛选</button>
+    <div class="filter-count" id="filterCount"></div>
+  </div>
+  <div class="section" style="padding:0">
+    <div class="table-wrap">
+      <table id="detailTable">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th>日期</th>
+            <th>店铺</th>
+            <th>会话ID</th>
+            <th>用户名</th>
+            <th>接待客服</th>
+            <th>问题场景</th>
+            <th>会话评价</th>
+            <th style="width:70px;text-align:center">质检分</th>
+            <th>扣分项</th>
+            <th style="min-width:280px">优化话术 & 方向</th>
+          </tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 客服绩效页 -->
+<div class="page" id="page-agent">
+  <div class="agent-grid" id="agentGrid"></div>
+  <div class="section" style="margin-top:20px">
+    <div class="section-header"><div class="section-title">本期下周抽检配额建议</div></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>客服</th><th>本期平均分</th><th>本期质检条数</th><th>等级</th><th>下周建议抽检条数</th><th>重点关注场景</th></tr></thead>
+        <tbody id="quotaBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- 问题分析页 -->
+<div class="page" id="page-issue">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+    <div class="section">
+      <div class="section-header"><div class="section-title">扣分项频次排行</div></div>
+      <div id="issueRankList"></div>
+    </div>
+    <div class="section">
+      <div class="section-header"><div class="section-title">维度扣分分布</div></div>
+      <div class="chart-container"><canvas id="dimChart"></canvas></div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-header"><div class="section-title">各维度标准话术库</div></div>
+    <div id="scriptLibrary"></div>
+  </div>
+</div>
+
+<!-- 店铺流程页 -->
+<div class="page" id="page-shopflow">
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">店铺流程管理</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:13px;color:var(--text2)">切换店铺：</label>
+        <select id="shopflowSelect" onchange="switchShopflow(this.value)" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none">
+          <option value="mcd">🍔 麦当劳官方旗舰店</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 麦当劳流程 -->
+    <div id="shopflow-mcd">
+      <div class="sop-section">
+        <div class="sop-title">一、售前服务流程</div>
+        <table class="sop-table">
+          <tr><th width="140">场景</th><th>标准处理方式</th><th width="200">注意事项</th></tr>
+          <tr><td>核销方式咨询</td><td>
+            支持2种方式：<br>
+            <strong>【麦乐送点餐】</strong> APP/小程序→麦乐送→卡券→立即使用→提交订单<br>
+            <strong>【手机自助点餐】</strong> APP/小程序→我的→到店券→立即使用→选门店→去支付→凭取餐码取餐
+          </td><td>登录App手机号须与购券手机号一致</td></tr>
+          <tr><td>适用门店/渠道</td><td>适用于部分麦当劳餐厅，麦乐送下单限麦乐送餐厅，详询店内</td><td>港澳台/西藏/海南三亚/交通枢纽/旅游景区特殊餐厅<strong>不可用</strong></td></tr>
+          <tr><td>O麦金会员权益</td><td>8大权益：超值套餐 / 6折早餐 / 9.9元咖啡 / 免费配送 / 福利金 / 生日礼遇 / 新品尝鲜 / 周边特权<br>时效：30天 / 90天 / 180天 / 365天四种</td><td>权益仅限本人使用，不可退换兑现金</td></tr>
+          <tr><td>产品有效期</td><td>购买当日可用，自购买次日0时起【N】天可用，过期自动退款</td><td>具体天数以商品详情页为准</td></tr>
+          <tr><td>券码在哪里查看</td><td>团购券自动发放至购券手机号关联的麦当劳账户，路径：【麦当劳APP/小程序】→【我的】→【麦当劳钱包】</td><td>—</td></tr>
+          <tr><td>本地订单咨询</td><td>路径一：直播间右下角【小黄车】→右上角三个点→【咨询】<br>路径二：拨打官方热线 4009200205</td><td>⚠️ 接到本地订单问题不可推脱不知道</td></tr>
+        </table>
+      </div>
+
+      <div class="sop-section">
+        <div class="sop-title">二、退款处理流程</div>
+        <div class="highlight-box"><strong>⚠️ 全局规则：</strong>所有退款原因选择【与商家协商一致退款】，<strong>禁止选择"商品品质原因"</strong>；所有退款订单需通知 Ada 做税务冲红</div>
+
+        <table class="sop-table" style="margin-top:12px">
+          <tr><th width="140">退款类型</th><th>标准流程</th><th width="220">注意事项</th></tr>
+          <tr><td>餐券未核销退款</td><td>
+            未核销可随时退，过期自动退（无需操作）<br>
+            手动退款：抖音后台→【我的订单】→点击订单→【申请退款】→选【与商家协商一致退款】<br>
+            退款1-3个工作日到账
+          </td><td>退款原因<strong>必须选"与商家协商一致退款"</strong></td></tr>
+          <tr><td>餐券已核销退款</td><td>
+            <div class="flow-steps" style="flex-direction:column;gap:4px">
+              <div class="flow-step"><div class="flow-step-box" style="font-size:12px">① 先拒绝退款 + 安抚顾客</div></div>
+              <div class="flow-step"><div class="flow-step-box" style="font-size:12px;background:var(--warn)">② 顾客情绪激烈 → 引导联系麦当劳官方</div></div>
+            </div>
+            引导方式1：小程序/APP→【我的】→【我的订单】→【问题订单】→【联系客服】→【转人工】<br>
+            引导方式2：拨打400电话 4009-200-205（9:00-18:00）<br>
+            材料：订单号 + 手机号 + 取餐码截图
+          </td><td>需顾客准备好材料再引导拨打400</td></tr>
+          <tr><td>O麦金卡退款</td><td>
+            特殊商品，不支持无理由退货<br>
+            后台退款申请<strong>一律先拒绝</strong><br>
+            个人原因强烈要求退款：<br>
+            ① 客服发邮件给 IT Tommy Hao & CRM Support 确认是否已使用<br>
+            邮件格式：订单编号+充值手机号+订单截图<br>
+            ② 确认未核销 → 业务确认 → CRM作废 → 开售后入口 → 顾客手动退款
+          </td><td>⚠️ 申请退款引导顾客承认个人原因<br>所有退款通知Ada税务冲红</td></tr>
+          <tr><td>早餐卡退款</td><td>
+            特殊商品，不支持无理由退货，后台申请一律拒绝<br>
+            顾客强烈要求：引导联系400/CCC → CCC确认未使用 → CCC作废 → 通知客服 → 业务确认 → 顾客手动退款
+          </td><td>需在规定时间内回复，否则自动同意退款</td></tr>
+          <tr><td>手机号填错退款</td><td>下单成功后无法修改手机号，手机号错误→无法出取餐码→等24小时系统自动退款</td><td>下单时可修改，下单成功后不可改</td></tr>
+        </table>
+      </div>
+
+      <div class="sop-section">
+        <div class="sop-title">三、核销异常处理</div>
+        <table class="sop-table">
+          <tr><th width="160">异常类型</th><th>排查与处理步骤</th><th width="200">升级条件</th></tr>
+          <tr><td>二维码无法核销</td><td>
+            依次排查：<br>
+            ① 下单手机号 是否与麦当劳APP绑定手机号一致<br>
+            ② 所选餐厅 是否为适用门店<br>
+            ③ 是否选择正确取餐方式（到店堂食/外带；福袋不支持麦乐送）<br>
+            ④ 是否按APP步骤操作
+          </td><td>排查后仍无法解决 → 引导拨打400-009-200-205</td></tr>
+          <tr><td>券码未及时到账</td><td>
+            安抚顾客：活动火爆，到账有1-2min延迟<br>
+            超过10min未到账：告知已加急处理，耐心等待并记录反馈
+          </td><td>超过30min仍未到账 → 升级处理</td></tr>
+          <tr><td>订单显示已使用但未取餐</td><td>
+            ① 先确认是否下过预约单（预约单取消后可继续下单）<br>
+            ② 若非预约单：引导联系麦当劳小程序客服 → CCC核实 → 确认未出餐可退款<br>
+            话术：让用户告知小程序客服"在抖音麦当劳旗舰店下单，显示已核销未取餐，诉求退款，请发工单核实"
+          </td><td>系统时间差需CCC内部核实，引导转小程序人工客服</td></tr>
+        </table>
+      </div>
+
+      <div class="sop-section">
+        <div class="sop-title">四、促转化话术要点</div>
+        <table class="sop-table">
+          <tr><th width="160">场景</th><th>推荐话术要点</th></tr>
+          <tr><td>未下单咨询产品</td><td>根据咨询产品介绍价格机制促转化；营造限时感（"活动火爆，库存有限"）；根据时段推送对应产品（早餐/正餐/下午茶）</td></tr>
+          <tr><td>已下单推荐关联品</td><td>买三主食 → 推可盐可甜四重奏；需麦乐送 → 推O麦金会员；叠加福利 → 推新品/季节品</td></tr>
+          <tr><td>问题解决后邀好评</td><td>"麻烦您动动发财的小手给小客服一个满星评价哦！评价不等于服务结束，如有其他问题随时提问～"</td></tr>
+          <tr><td>限购问题</td><td>说明每个ID限购规则，推荐其他类似产品链接</td></tr>
+        </table>
+      </div>
+
+      <div class="sop-section">
+        <div class="sop-title">五、话术红线（禁止事项）</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:8px">
+          <div style="background:#fff0f0;border:1px solid #ffcdd2;border-radius:8px;padding:14px">
+            <div style="font-weight:700;color:#B71C1C;margin-bottom:8px;font-size:13px">🚫 严禁行为</div>
+            <ul style="font-size:12px;color:#444;line-height:2;padding-left:16px">
+              <li>退款原因选择"商品品质原因"</li>
+              <li>私自承诺无法兑现的优惠或赔偿</li>
+              <li>本地订单推脱称不知道</li>
+              <li>O麦金卡/早餐卡直接同意退款（需走流程）</li>
+              <li>泄露顾客隐私信息</li>
+              <li>与顾客发生争吵或使用不文明用语</li>
+            </ul>
+          </div>
+          <div style="background:#fff8e1;border:1px solid #ffe082;border-radius:8px;padding:14px">
+            <div style="font-weight:700;color:#E65100;margin-bottom:8px;font-size:13px">⚠️ 必须执行</div>
+            <ul style="font-size:12px;color:#444;line-height:2;padding-left:16px">
+              <li>所有退款通知 Ada 做税务冲红</li>
+              <li>退款原因统一选"与商家协商一致退款"</li>
+              <li>申请退款引导顾客承认是个人原因</li>
+              <li>O麦金卡/早餐卡后台申请一律先拒绝</li>
+              <li>规定时间内回复退款申请（否则自动同意）</li>
+            </ul>
+          </div>
+          <div style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:14px">
+            <div style="font-weight:700;color:#2E7D32;margin-bottom:8px;font-size:13px">✅ 升级联系方式</div>
+            <ul style="font-size:12px;color:#444;line-height:2;padding-left:16px">
+              <li>麦当劳顾客中心：4009-200-205</li>
+              <li>工作时间：每天 9:00 - 18:00</li>
+              <li>小程序路径：我的→我的订单→问题订单→联系客服→转人工</li>
+              <li>O麦金卡升级：邮件 Tommy Hao + CRM Support</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SOP页 -->
+<div class="page" id="page-sop">
+  <div class="section">
+    <div class="sop-section">
+      <div class="sop-title">一、质检总则</div>
+      <table class="sop-table">
+        <tr><th width="120">项目</th><th>说明</th></tr>
+        <tr><td>质检执行人</td><td>客服组长 / 客服主管 / AI质检系统</td></tr>
+        <tr><td>质检对象</td><td>全体一线客服（麦小妖、麦小薇、麦小东、麦小风、麦小淼）</td></tr>
+        <tr><td>质检周期</td><td>每日执行，每周汇总，每月考核</td></tr>
+        <tr><td>质检平台</td><td>飞鸽客服系统（im.jinritemai.com）</td></tr>
+        <tr><td>合格线</td><td>单次质检 ≥85分为合格；月度合格率 = 合格条数 / 总质检条数</td></tr>
+        <tr><td>考核关联</td><td>月度合格率 &lt;85% → 警示；差评专项合格率 &lt;70% → 必须参加专项培训</td></tr>
+      </table>
+    </div>
+
+    <div class="sop-section">
+      <div class="sop-title">二、每日质检流程</div>
+      <div class="flow-steps">
+        <div class="flow-step"><div class="flow-step-box">① 必检差评</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">② 场景抽检5条</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">③ 长会话抽检5条</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">④ 补充抽检2条</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">⑤ 更新台账</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">⑥ 发布日报</div></div>
+      </div>
+      <table class="sop-table" style="margin-top:12px">
+        <tr><th>步骤</th><th>质检类型</th><th>数量</th><th>触发条件</th><th>筛选方式</th></tr>
+        <tr><td>① 必检</td><td>差评/中评会话</td><td>全部</td><td>每日必做，无上限</td><td>飞鸽筛选：会话评价 = 不满意+非常不满意</td></tr>
+        <tr><td>② 场景抽检</td><td>当日场景轮转（见下表）</td><td>5条</td><td>每日按场景周计划</td><td>飞鸽筛选：关键词/问题类型</td></tr>
+        <tr><td>③ 长会话抽检</td><td>时长≥8分钟 且未评价</td><td>5条</td><td>每日必做</td><td>飞鸽筛选：会话时长 ≥8分钟 + 未评价</td></tr>
+        <tr><td>④ 补充抽检</td><td>近期低分客服优先</td><td>2条</td><td>可选，建议每日执行</td><td>优先选平均分最低的客服的会话</td></tr>
+      </table>
+    </div>
+
+    <div class="sop-section">
+      <div class="sop-title">三、场景轮转周计划</div>
+      <table class="sop-table">
+        <tr><th>星期</th><th>质检场景</th><th>重点检查维度</th><th>筛选关键词</th></tr>
+        <tr><td>周一</td><td>退款/退单类</td><td>退款时效告知、方案完整性</td><td>退款、退单、取消、申请退</td></tr>
+        <tr><td>周二</td><td>配送异常类</td><td>情绪安抚、赔偿方案、升级处理</td><td>配送、超时、未到、骑手、丢失</td></tr>
+        <tr><td>周三</td><td>优惠券/活动类</td><td>信息准确性、条件完整告知</td><td>优惠券、活动、返券、积分、兑换</td></tr>
+        <tr><td>周四</td><td>投诉/差评类</td><td>安抚话术、问题解决闭环</td><td>投诉、不满意、太差、问题、差评</td></tr>
+        <tr><td>周五</td><td>一般咨询类</td><td>开结束语、引导好评、信息准确</td><td>营业时间、套餐、菜单、价格</td></tr>
+        <tr><td>周六/日</td><td>补充/遗漏场景</td><td>灵活处理本周发现问题</td><td>根据本周情况决定</td></tr>
+      </table>
+    </div>
+
+    <div class="sop-section">
+      <div class="sop-title">四、质检评分标准（满分100分）</div>
+      <table class="sop-table">
+        <tr><th>维度</th><th>评分标准</th><th>扣分范围</th><th>常见扣分项</th></tr>
+        <tr><td><span class="tag tag-dim1">维度1</span><br>沟通体验与规范</td><td>开场白/结束语、等待话术、用语规范</td><td>扣1-5分/项</td><td>结束语缺失、等待话术生硬、用语不规范</td></tr>
+        <tr><td><span class="tag tag-dim2">维度2</span><br>业务知识与准确性</td><td>信息准确、方案完整告知</td><td>扣5-10分/项</td><td>错误信息、未告知时效/条件、方案不完整</td></tr>
+        <tr><td><span class="tag tag-dim3">维度3</span><br>沟通与解决问题能力</td><td>理解需求、情绪安抚、有效解决</td><td>扣5-10分/项</td><td>答非所问、情绪安抚不足、解决方案单一</td></tr>
+        <tr><td><span class="tag tag-dim4">维度4</span><br>流程与系统操作</td><td>建单准确、信息记录、必要时升级</td><td>扣5分/项</td><td>流程缺步骤、信息记录不完整、未升级</td></tr>
+        <tr><td><span class="tag tag-dim5">维度5</span><br>严重错误（一票否决）</td><td>争吵、泄露隐私、私自承诺赔偿</td><td>直接0分</td><td>任意一项触发，本次质检0分</td></tr>
+      </table>
+    </div>
+
+    <div class="sop-section">
+      <div class="sop-title">五、人员KPI考核规则</div>
+      <table class="sop-table">
+        <tr><th>指标</th><th>计算方式</th><th>说明</th></tr>
+        <tr><td>整体合格率</td><td>质检分≥85的条数 ÷ 总质检条数</td><td>月度汇总，按客服个人统计</td></tr>
+        <tr><td>差评专项合格率</td><td>差评中处理达标条数 ÷ 总差评条数</td><td>达标 = 分≥80且有完整解决方案</td></tr>
+        <tr><td>周均抽检条数</td><td>根据历史得分动态调整</td><td>见下方分档规则</td></tr>
+      </table>
+      <div style="margin-top:12px">
+      <table class="sop-table">
+        <tr><th>近期平均分区间</th><th>每周随机抽检条数</th><th>附加要求</th></tr>
+        <tr><td>≥95分（优秀）</td><td>2条</td><td>无</td></tr>
+        <tr><td>90-94分（良好）</td><td>3条</td><td>无</td></tr>
+        <tr><td>85-89分（需关注）</td><td>5条</td><td>需反馈改进计划</td></tr>
+        <tr><td>&lt;85分（警示）</td><td>8条+专项复核</td><td>必须参加1v1辅导</td></tr>
+      </table>
+      </div>
+      <div class="highlight-box" style="margin-top:12px">
+        <strong>💡 公平性保障：</strong>每周五检查各客服被抽检次数，若某客服本周0条被抽，下周补充抽检优先选其会话。开场/结束语检查每客服每天只检1条，避免重复扣分。
+      </div>
+    </div>
+
+    <div class="sop-section">
+      <div class="sop-title">六、质检申诉流程</div>
+      <div class="flow-steps">
+        <div class="flow-step"><div class="flow-step-box">客服提出申诉</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">48小时内提交</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">主管复核会话</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">3个工作日内回复</div><div class="flow-arrow">→</div></div>
+        <div class="flow-step"><div class="flow-step-box">更新质检结果</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 绩效留档页 -->
+<div class="page" id="page-perf">
+  <style>
+    .pf-stat{background:var(--card);border-radius:10px;padding:14px 18px;box-shadow:0 1px 4px rgba(0,0,0,0.08);border-top:3px solid var(--primary);text-align:center}
+    .pf-stat.green{border-top-color:var(--pass)} .pf-stat.gold{border-top-color:var(--gold)}
+    .pf-stat-label{font-size:12px;color:var(--text2);margin-bottom:4px}
+    .pf-stat-val{font-size:24px;font-weight:700}
+    .pf-form{background:var(--card);border-radius:12px;padding:20px 22px;box-shadow:0 1px 4px rgba(0,0,0,0.08);margin-bottom:18px}
+    .pf-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:10px}
+    .pf-row label{font-size:12px;color:var(--text2);display:block;margin-bottom:3px}
+    .pf-row input,.pf-row select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;background:white}
+    .pf-row input:focus,.pf-row select:focus{border-color:var(--primary)}
+    .btn-pf-pri{background:var(--primary);color:white;border:none;padding:9px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+    .btn-pf-pri:hover{background:var(--primary-dark)}
+    .btn-pf-pri:disabled{opacity:.5;cursor:not-allowed}
+    .btn-pf-sec{background:#f5f5f5;color:var(--text2);border:1px solid var(--border);padding:9px 18px;border-radius:8px;font-size:13px;cursor:pointer}
+    .btn-pf-sec:hover{background:#eee}
+    #perfToast{display:none;position:fixed;bottom:24px;right:24px;color:white;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+    #perfLoadingBar{display:none;width:100%;height:3px;background:linear-gradient(90deg,var(--primary) 0%,var(--gold) 50%,var(--primary) 100%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:2px;margin-bottom:12px}
+    @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+  </style>
+
+  <div id="perfLoadingBar"></div>
+  <div id="perfToast"></div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <select id="perfMonthFilter" onchange="renderPerfList()" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none">
+        <option value="">全部月份</option>
+      </select>
+      <select id="perfRoleFilter" onchange="renderPerfList()" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none">
+        <option value="">全部岗位</option>
+        <option value="reception">接待客服</option>
+        <option value="workorder">工单客服</option>
+        <option value="leader">客服组长</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-pf-sec" onclick="exportPerfCSV()">导出 CSV（人资用）</button>
+      <button class="btn-pf-pri" onclick="openNewPerfForm()">+ 新增绩效记录</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:12px;margin-bottom:18px;flex-wrap:wrap">
+    <div class="pf-stat" style="min-width:120px"><div class="pf-stat-label">留档人次</div><div class="pf-stat-val" id="perfStatCount">—</div></div>
+    <div class="pf-stat green" style="min-width:140px"><div class="pf-stat-label">平均绩效系数</div><div class="pf-stat-val" id="perfStatAvg" style="color:var(--pass)">—</div></div>
+    <div class="pf-stat gold" style="min-width:160px"><div class="pf-stat-label">合计实发绩效</div><div class="pf-stat-val" id="perfStatAmt" style="color:#B8860B">—</div></div>
+  </div>
+
+  <!-- 新增/编辑表单 -->
+  <div id="perfFormWrap" style="display:none">
+    <div class="pf-form">
+      <div style="font-size:15px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <span style="width:4px;height:16px;background:var(--primary);border-radius:2px;display:inline-block"></span>
+        录入绩效数据
+      </div>
+      <div class="pf-row">
+        <div><label>姓名 *</label><input type="text" id="pf_name" placeholder="如：麦小妖"></div>
+        <div><label>考核月份 *</label><input type="month" id="pf_month"></div>
+        <div>
+          <label>岗位 *</label>
+          <select id="pf_role" onchange="renderPerfFormFields()">
+            <option value="reception">接待客服</option>
+            <option value="workorder">工单客服</option>
+            <option value="leader">客服组长</option>
+          </select>
+        </div>
+        <div><label>所属组</label><input type="text" id="pf_group" placeholder="如：接待A组"></div>
+        <div><label>绩效基数（元）</label><input type="number" id="pf_base" value="1000" oninput="updatePerfPreview()"></div>
+        <div style="display:flex;flex-direction:column;justify-content:flex-end">
+          <label>实时预览</label>
+          <div id="perfPreview" style="padding:8px 12px;background:#f8f8f8;border-radius:6px;min-height:38px;display:flex;align-items:center">—</div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text2);margin:10px 0 4px">各指标达标率（0–100，代表该指标的店铺达标率%）</div>
+      <div id="perfFormFields"></div>
+      <div style="margin-top:14px;display:flex;gap:10px">
+        <button class="btn-pf-pri" id="perfSubmitBtn" onclick="submitPerfForm()">保存留档</button>
+        <button class="btn-pf-sec" onclick="closePerfForm()">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 留档记录表 -->
+  <div class="section" style="padding:0">
+    <div style="padding:13px 16px;border-bottom:1px solid var(--border);font-size:14px;font-weight:700">月度绩效留档记录</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>月份</th><th>姓名</th><th>岗位</th><th>所属组</th><th>基数</th><th>系数</th><th>实发</th><th>各项达标率</th><th>操作</th></tr>
+        </thead>
+        <tbody id="perfArchiveBody">
+          <tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">加载中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-radius:8px;border:1px solid var(--gold);font-size:12px;color:#666;line-height:1.8">
+    <strong style="color:#B8860B">云端说明：</strong>数据存储在 Supabase 云端，你录入后老板打开链接即可实时看到。
+    导出 CSV 可直接交给人资。如数据加载失败，请检查页面顶部的 SUPABASE_URL 和 SUPABASE_ANON_KEY 是否已正确填写。
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script src="data.js"></script>
+<script>
+// ============ 工具函数 ============
+function getScoreClass(s) { return s >= 90 ? 'pass' : s >= 80 ? 'warn' : 'fail'; }
+function getScoreColor(s) { return s >= 95 ? '#4CAF50' : s >= 90 ? '#66BB6A' : s >= 85 ? '#FFC107' : s >= 80 ? '#FF9800' : '#F44336'; }
+function getDimTag(dim) { return `<span class="tag tag-dim${dim}">维度${dim}</span>`; }
+function getAgentTag(name) { return `<span class="agent-tag agent-${name}">${name}</span>`; }
+function isBadReview(ev) { return ev && ev.includes('差评'); }
+function isLowScore(s) { return s < 90; }
+
+// ============ 初始化 ============
+window.onload = function() {
+  QC_CONFIG.lastUpdated && (document.getElementById('lastUpdateTime').textContent = QC_CONFIG.lastUpdated);
+
+  // 计算整体统计
+  const total = QC_SESSIONS.length;
+  const passCount = QC_SESSIONS.filter(s => s.score >= 85).length;
+  const passRate = Math.round(passCount / total * 100);
+  const avgScore = Math.round(QC_SESSIONS.reduce((a, b) => a + b.score, 0) / total * 10) / 10;
+  const badCount = QC_SESSIONS.filter(s => isBadReview(s.evaluation)).length;
+  const lowCount = QC_SESSIONS.filter(s => isLowScore(s.score)).length;
+
+  document.getElementById('passRateBadge').textContent = `合格率 ${passRate}%`;
+
+  // Stats Cards
+  document.getElementById('statsGrid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">本期质检总条数</div><div class="stat-value">${total}</div><div class="stat-sub">唯一会话（已去重）</div></div>
+    <div class="stat-card green"><div class="stat-label">整体合格率</div><div class="stat-value" style="color:var(--pass)">${passRate}%</div><div class="stat-sub">合格线：85分，合格${passCount}条</div></div>
+    <div class="stat-card gold"><div class="stat-label">平均质检分</div><div class="stat-value" style="color:#E65100">${avgScore}</div><div class="stat-sub">满分100分</div></div>
+    <div class="stat-card red"><div class="stat-label">差评会话</div><div class="stat-value" style="color:var(--fail)">${badCount}</div><div class="stat-sub">需重点复盘</div></div>
+    <div class="stat-card orange"><div class="stat-label">需关注会话（<90分）</div><div class="stat-value" style="color:var(--warn)">${lowCount}</div><div class="stat-sub">建议专项培训</div></div>
+    <div class="stat-card"><div class="stat-label">质检客服数</div><div class="stat-value">${AGENT_SUMMARY.length}</div><div class="stat-sub">${AGENT_SUMMARY.map(a=>a.name).join('、')}</div></div>
+  `;
+
+  // 低分列表
+  const lowSessions = QC_SESSIONS.filter(s => isLowScore(s.score));
+  document.getElementById('lowScoreList').innerHTML = lowSessions.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th>日期</th><th>用户名</th><th>接待客服</th><th>场景</th><th>得分</th><th>主要扣分项</th></tr></thead>
+      <tbody>${lowSessions.map(s => `<tr class="low-score">
+        <td>${s.date}</td><td>${s.username}</td><td>${getAgentTag(s.agent)}</td>
+        <td>${s.scenario}</td>
+        <td><span class="score-badge ${getScoreClass(s.score)}" style="width:36px;height:36px;font-size:13px">${s.score}</span></td>
+        <td>${s.deductions.map(d => `<span class="tag tag-dim${d.dim}">${d.item}(${d.points})</span>`).join('')}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : '<div class="empty"><div class="empty-icon">✅</div><p>本期无低分会话</p></div>';
+
+  // 差评列表
+  const badSessions = QC_SESSIONS.filter(s => isBadReview(s.evaluation));
+  document.getElementById('badReviewList').innerHTML = badSessions.length ? `
+    <div class="table-wrap"><table>
+      <thead><tr><th>日期</th><th>用户名</th><th>接待客服</th><th>场景</th><th>评价</th><th>得分</th><th>优化方向</th></tr></thead>
+      <tbody>${badSessions.map(s => `<tr class="bad-review">
+        <td>${s.date}</td><td>${s.username}</td><td>${getAgentTag(s.agent)}</td>
+        <td>${s.scenario}</td><td><span class="tag tag-bad">${s.evaluation}</span></td>
+        <td><span class="score-badge ${getScoreClass(s.score)}" style="width:36px;height:36px;font-size:13px">${s.score}</span></td>
+        <td style="font-size:12px;color:#555">${s.direction}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>` : '<div class="empty"><div class="empty-icon">🎉</div><p>本期无差评会话</p></div>';
+
+  // 图表 - 客服得分
+  const agentNames = AGENT_SUMMARY.map(a => a.name);
+  const agentAvgs = AGENT_SUMMARY.map(a => a.avg);
+  new Chart(document.getElementById('agentChart'), {
+    type: 'bar',
+    data: {
+      labels: agentNames,
+      datasets: [{
+        label: '平均质检分',
+        data: agentAvgs,
+        backgroundColor: agentAvgs.map(s => getScoreColor(s) + '99'),
+        borderColor: agentAvgs.map(s => getScoreColor(s)),
+        borderWidth: 2, borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { min: 80, max: 100, grid: { color: '#f0f0f0' } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // 图表 - 问题类型
+  const issueMap = {};
+  QC_SESSIONS.forEach(s => s.deductions.forEach(d => {
+    issueMap[d.item] = (issueMap[d.item] || 0) + 1;
+  }));
+  const topIssues = Object.entries(issueMap).sort((a,b) => b[1]-a[1]).slice(0, 6);
+  new Chart(document.getElementById('issueChart'), {
+    type: 'doughnut',
+    data: {
+      labels: topIssues.map(i => i[0]),
+      datasets: [{ data: topIssues.map(i => i[1]), backgroundColor: ['#DA291C','#FFC72C','#FF9800','#4CAF50','#2196F3','#9C27B0'], borderWidth: 2, borderColor: 'white' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+  });
+
+  // 初始化明细页
+  initDetailPage();
+  // 初始化客服页
+  initAgentPage();
+  // 初始化问题页
+  initIssuePage();
+};
+
+// ============ 明细页 ============
+function initDetailPage() {
+  const shops = [...new Set(QC_SESSIONS.map(s => s.shop || '').filter(Boolean))].sort();
+  const agents = [...new Set(QC_SESSIONS.map(s => s.agent))];
+  const dates = [...new Set(QC_SESSIONS.map(s => s.date))];
+  const shopSel = document.getElementById('shopFilter');
+  const agentSel = document.getElementById('agentFilter');
+  const dateSel = document.getElementById('dateFilter');
+  shops.forEach(sh => { const o = document.createElement('option'); o.value = sh; o.textContent = sh; shopSel.appendChild(o); });
+  agents.forEach(a => { const o = document.createElement('option'); o.value = a; o.textContent = a; agentSel.appendChild(o); });
+  dates.forEach(d => { const o = document.createElement('option'); o.value = d; o.textContent = d; dateSel.appendChild(o); });
+  renderDetailTable(QC_SESSIONS);
+}
+
+function applyFilters() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const shop = document.getElementById('shopFilter').value;
+  const agent = document.getElementById('agentFilter').value;
+  const date = document.getElementById('dateFilter').value;
+  const eval_ = document.getElementById('evalFilter').value;
+  const score = document.getElementById('scoreFilter').value;
+  let filtered = QC_SESSIONS.filter(s => {
+    if (search && !s.id.includes(search) && !s.username.toLowerCase().includes(search) && !s.scenario.toLowerCase().includes(search) && !s.agent.includes(search) && !(s.shop||'').includes(search)) return false;
+    if (shop && (s.shop || '') !== shop) return false;
+    if (agent && s.agent !== agent) return false;
+    if (date && s.date !== date) return false;
+    if (eval_ === '差评' && !isBadReview(s.evaluation)) return false;
+    if (eval_ === '正常' && isBadReview(s.evaluation)) return false;
+    if (score === 'low' && s.score >= 85) return false;
+    if (score === 'mid' && (s.score < 85 || s.score >= 95)) return false;
+    if (score === 'high' && s.score < 95) return false;
+    return true;
+  });
+  renderDetailTable(filtered);
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('shopFilter').value = '';
+  document.getElementById('agentFilter').value = '';
+  document.getElementById('dateFilter').value = '';
+  document.getElementById('evalFilter').value = '';
+  document.getElementById('scoreFilter').value = '';
+  renderDetailTable(QC_SESSIONS);
+}
+
+function renderDetailTable(sessions) {
+  document.getElementById('filterCount').textContent = `显示 ${sessions.length} / ${QC_SESSIONS.length} 条`;
+  const tbody = document.getElementById('detailBody');
+  tbody.innerHTML = sessions.length === 0 ? `<tr><td colspan="11"><div class="empty"><div class="empty-icon">🔍</div><p>无匹配数据</p></div></td></tr>` :
+    sessions.map((s, i) => `
+      <tr class="${isBadReview(s.evaluation) ? 'bad-review' : isLowScore(s.score) ? 'low-score' : ''}">
+        <td style="color:var(--text2);font-size:12px">${i+1}</td>
+        <td style="font-size:12px;white-space:nowrap">${s.date}</td>
+        <td style="font-size:12px;white-space:nowrap;max-width:140px;color:var(--text2)">${s.shop || '—'}</td>
+        <td style="font-size:11px;color:var(--text2);word-break:break-all;max-width:130px">${s.id}</td>
+        <td style="white-space:nowrap">${s.username}</td>
+        <td>${getAgentTag(s.agent)}</td>
+        <td style="white-space:nowrap">${s.scenario}</td>
+        <td><span class="tag ${isBadReview(s.evaluation) ? 'tag-bad' : 'tag-normal'}">${s.evaluation}</span></td>
+        <td style="text-align:center"><span class="score-badge ${getScoreClass(s.score)}">${s.score}</span></td>
+        <td><div class="deduction-list">${s.deductions.map(d => `<div class="deduction-item">${getDimTag(d.dim)}<span class="deduction-points">${d.points}分</span><span style="font-size:12px">${d.item}</span></div>`).join('')}</div></td>
+        <td><div class="script-box">${s.improvedScript}</div><div class="direction-box">💡 ${s.direction}</div></td>
+      </tr>`).join('');
+}
+
+// ============ 客服绩效页 ============
+function initAgentPage() {
+  const avatarColors = { '麦小妖': '#C2185B', '麦小薇': '#1565C0', '麦小东': '#2E7D32', '麦小风': '#E65100', '麦小淼': '#6A1B9A' };
+  const levelMap = { '优秀': { class: 'score-excellent', bar: '#4CAF50' }, '良好': { class: 'score-good', bar: '#66BB6A' }, '需改进': { class: 'score-warn', bar: '#FF9800' }, '警示': { class: 'score-fail', bar: '#F44336' } };
+
+  document.getElementById('agentGrid').innerHTML = AGENT_SUMMARY.map(a => {
+    const lvl = levelMap[a.level] || levelMap['良好'];
+    const pct = Math.round((a.avg - 80) / 20 * 100);
+    const sessions = QC_SESSIONS.filter(s => s.agent === a.name);
+    const issues = {};
+    sessions.forEach(s => s.deductions.forEach(d => { issues[d.item] = (issues[d.item] || 0) + 1; }));
+    const topIssue = Object.entries(issues).sort((a,b) => b[1]-a[1])[0];
+    return `
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <div class="agent-avatar" style="background:${avatarColors[a.name]}">${a.name[1]}</div>
+        <div class="agent-info">
+          <h3>${a.name}</h3>
+          <p>本期质检 ${a.count} 条 &nbsp;<span class="level-badge level-${a.level}">${a.level}</span></p>
+        </div>
+        <div class="agent-score-big ${lvl.class}" style="margin-left:auto">${a.avg}</div>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${lvl.bar}"></div></div>
+      <div class="agent-stats">
+        <div class="agent-stat"><div class="agent-stat-val" style="color:var(--pass)">${a.max}</div><div class="agent-stat-label">最高分</div></div>
+        <div class="agent-stat"><div class="agent-stat-val" style="color:var(--fail)">${a.min}</div><div class="agent-stat-label">最低分</div></div>
+        <div class="agent-stat"><div class="agent-stat-val">${a.weeklyQuota}</div><div class="agent-stat-label">周抽检配额</div></div>
+      </div>
+      ${topIssue ? `<div style="margin-top:10px;font-size:12px;color:var(--text2)">⚠️ 最高频问题：<strong>${topIssue[0]}</strong>（${topIssue[1]}次）</div>` : ''}
+    </div>`;
+  }).join('');
+
+  // 配额表
+  const focusMap = { '麦小妖': '结束语规范、投诉安抚', '麦小薇': '情绪安抚话术、退款场景', '麦小东': '返券/退款概念区分、先确认再回答', '麦小风': '等待话术微调', '麦小淼': '处理流程完整性、退款时效告知' };
+  document.getElementById('quotaBody').innerHTML = AGENT_SUMMARY.map(a => `
+    <tr>
+      <td>${getAgentTag(a.name)}</td>
+      <td><strong style="color:${getScoreColor(a.avg)}">${a.avg}分</strong></td>
+      <td>${a.count}条</td>
+      <td><span class="level-badge level-${a.level}">${a.level}</span></td>
+      <td><strong>${a.weeklyQuota}条</strong></td>
+      <td style="font-size:12px;color:var(--text2)">${focusMap[a.name] || '-'}</td>
+    </tr>`).join('');
+}
+
+// ============ 问题分析页 ============
+function initIssuePage() {
+  // 扣分项统计
+  const issueMap = {};
+  const dimMap = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  QC_SESSIONS.forEach(s => s.deductions.forEach(d => {
+    const key = d.item;
+    issueMap[key] = issueMap[key] || { count: 0, points: 0, dim: d.dim };
+    issueMap[key].count++;
+    issueMap[key].points += Math.abs(d.points);
+    dimMap[d.dim] = (dimMap[d.dim] || 0) + 1;
+  }));
+  const sorted = Object.entries(issueMap).sort((a,b) => b[1].count - a[1].count);
+
+  document.getElementById('issueRankList').innerHTML = sorted.map(([name, info], i) => `
+    <div class="issue-item">
+      <div class="issue-rank ${i < 3 ? 'top3' : ''}">${i+1}</div>
+      <div class="issue-detail">
+        <h4>${name} ${getDimTag(info.dim)}</h4>
+        <p>累计扣分：${info.points}分</p>
+      </div>
+      <div class="issue-count">${info.count}<small>次</small></div>
+    </div>`).join('');
+
+  // 维度分布图
+  new Chart(document.getElementById('dimChart'), {
+    type: 'radar',
+    data: {
+      labels: ['维度1\n沟通规范', '维度2\n业务知识', '维度3\n解决问题', '维度4\n流程操作', '维度5\n严重错误'],
+      datasets: [{
+        label: '扣分次数',
+        data: [dimMap[1], dimMap[2], dimMap[3], dimMap[4], dimMap[5]],
+        backgroundColor: 'rgba(218,41,28,0.15)',
+        borderColor: '#DA291C',
+        pointBackgroundColor: '#DA291C',
+        borderWidth: 2,
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { r: { beginAtZero: true, grid: { color: '#eee' }, ticks: { font: { size: 10 } } } } }
+  });
+
+  // 标准话术库
+  const dimScripts = [
+    { dim: 1, color: '#4CAF50', title: '沟通体验与规范', scripts: [
+      { label: '标准开场白', text: '您好！感谢您联系麦当劳官方旗舰店，我是客服[姓名]，请问有什么可以帮助您的？😊' },
+      { label: '标准结束语', text: '感谢您联系麦当劳官方客服～本次问题已为您处理完毕，如有其他需要随时联系我们！祝您用餐愉快🍔' },
+      { label: '等待话术', text: '稍等一下哦，我马上帮您查询～🔍 感谢您的耐心等待！' },
+      { label: '引导好评', text: '如果我的服务让您满意，欢迎给我们一个好评，您的支持是我们进步的动力！' },
+    ]},
+    { dim: 2, color: '#2196F3', title: '业务知识与准确性', scripts: [
+      { label: '退款时效告知', text: '退款已为您申请成功，预计1-3个工作日内退回至您的支付账户，请注意查收～如有疑问随时联系我们！' },
+      { label: '活动完整告知', text: '活动使用条件：①满XX元可用 ②有效期至XX ③每账号限用X次 ④不可与其他优惠叠加，请您留意哦～' },
+      { label: '订单修改说明', text: '在商家开始制作前可以为您取消重下！如果已开始制作则无法修改，您的订单目前[状态]，请问需要我帮您处理吗？' },
+    ]},
+    { dim: 3, color: '#FF9800', title: '沟通与解决问题能力', scripts: [
+      { label: '投诉安抚话术', text: '非常抱歉给您带来了不好的用餐体验！🙏 我理解您的心情，这确实是我们的失误，马上为您全力处理！' },
+      { label: '确认问题话术', text: '我理解您是想问[用户问题]，对吗？（先复述确认再回答，避免答非所问）' },
+      { label: '多方案提供', text: '您可以选择：①申请退款 ②重新配送 ③优惠补偿，请问您希望我们如何为您处理？' },
+    ]},
+    { dim: 4, color: '#9C27B0', title: '流程与系统操作', scripts: [
+      { label: '少送处理流程', text: '非常抱歉！我马上为您核实订单，[核实后] 确认少送了[餐品]，我现在为您安排补送/退款，请问您更希望哪种方式？' },
+      { label: '账户安全提示', text: '问题已处理好了～温馨提示：请注意保护账户信息安全，不要将密码透露给他人哦！如有异常请及时联系我们！🔒' },
+    ]},
+  ];
+
+  document.getElementById('scriptLibrary').innerHTML = dimScripts.map(dim => `
+    <div style="margin-bottom:20px">
+      <h4 style="font-size:13px;font-weight:700;color:${dim.color};margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span style="width:4px;height:14px;background:${dim.color};display:inline-block;border-radius:2px"></span>
+        维度${dim.dim}：${dim.title}
+      </h4>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
+        ${dim.scripts.map(s => `
+          <div style="border:1px solid ${dim.color}33;border-radius:8px;padding:12px;background:${dim.color}08">
+            <div style="font-size:12px;font-weight:700;color:${dim.color};margin-bottom:6px">${s.label}</div>
+            <div class="script-box" style="border-left-color:${dim.color};max-width:100%">${s.text}</div>
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+// ============ Tab切换 ============
+function switchTab(tab) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const tabs = ['dashboard','detail','agent','issue','sop','shopflow','perf'];
+  const idx = tabs.indexOf(tab);
+  document.querySelectorAll('.nav-tab')[idx].classList.add('active');
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'perf') initPerfPage();
+}
+
+function switchShopflow(val) {
+  document.querySelectorAll('[id^="shopflow-"]').forEach(el => el.style.display = 'none');
+  const target = document.getElementById('shopflow-' + val);
+  if (target) target.style.display = 'block';
+}
+
+// ============================================================
+// 绩效留档 — 云端版（Supabase）
+// ============================================================
+
+const PERF_WEIGHTS = {
+  reception: [
+    { key:'nonSat',   label:'非满意率达标率',   weight:0.25, note:'各店铺≤10%' },
+    { key:'qc',       label:'质检合格率',       weight:0.15, note:'≥90%' },
+    { key:'volume',   label:'日均接待量达标率', weight:0.40, note:'日均≥200单，80%工作日达标' },
+    { key:'respTime', label:'平均响应时长达标率',weight:0.10, note:'≤15s' },
+    { key:'reply3m',  label:'3分钟回复率达标率',weight:0.10, note:'≥99%' },
+  ],
+  workorder: [
+    { key:'qc',       label:'质检合格率',         weight:0.15, note:'≥95%' },
+    { key:'procTime', label:'售后处理时长达成率',  weight:0.30, note:'100%店铺达成' },
+    { key:'woCreate', label:'工单创建量达标率',    weight:0.15, note:'≥组内平均80%' },
+    { key:'woClose',  label:'工单完结量达标率',    weight:0.15, note:'≥组内平均80%' },
+    { key:'sop',      label:'流程遵守达标率',      weight:0.10, note:'错误单≤5单' },
+    { key:'assist',   label:'协助接待达标率',      weight:0.15, note:'及时协助有记录' },
+  ],
+  leader: [
+    { key:'teamNonSat',label:'团队非满达标率',     weight:0.30, note:'各店铺≤10%' },
+    { key:'custKpi',   label:'客户考核项达标率',   weight:0.20, note:'按客户考核/体验分' },
+    { key:'teamQc',    label:'团队质检合格率',     weight:0.10, note:'月均≥90%' },
+    { key:'training',  label:'培训计划完成率',     weight:0.15, note:'有效培训≥2次/月' },
+    { key:'teamVol',   label:'团队接待量达标率',   weight:0.10, note:'团队日均达标率≥80%' },
+    { key:'procOpt',   label:'流程优化落地达标率', weight:0.15, note:'每月≥1个问题落地' },
+  ]
+};
+
+const ROLE_LABELS = { reception:'接待客服', workorder:'工单客服', leader:'客服组长' };
+let _perfRecords = [];
+let _editingId = null;
+let _perfInited = false;
+
+function calcPerfCoef(scores, role) {
+  const weights = PERF_WEIGHTS[role] || [];
+  let total = 0;
+  weights.forEach(w => {
+    const rate = parseFloat(scores[w.key] || 0) / 100;
+    let contrib = 0;
+    if (w.key === 'volume') {
+      contrib = rate >= 0.8 ? w.weight : 0;
+    } else {
+      contrib = rate >= 0.8 ? w.weight : rate >= 0.6 ? w.weight * (rate / 0.8) : 0;
+    }
+    total += contrib;
+  });
+  const adj = parseFloat(scores.adjustment || 0) / 100;
+  return Math.min(1, Math.max(0, total + adj));
+}
+
+// ---------- Supabase CRUD ----------
+async function dbLoad() {
+  const { data, error } = await _supa.from('perf_records').select('*').order('month', { ascending: false });
+  if (error) { console.error('加载失败', error); return []; }
+  return data || [];
+}
+
+async function dbSave(rec) {
+  const payload = {
+    name: rec.name, month: rec.month, role: rec.role,
+    group_name: rec.group || '', base_salary: rec.base,
+    scores: rec.scores, coef: rec.coef
+  };
+  if (rec.db_id) {
+    const { error } = await _supa.from('perf_records').update(payload).eq('id', rec.db_id);
+    return !error;
+  } else {
+    const { error } = await _supa.from('perf_records').insert(payload);
+    return !error;
+  }
+}
+
+async function dbDelete(db_id) {
+  const { error } = await _supa.from('perf_records').delete().eq('id', db_id);
+  return !error;
+}
+
+// ---------- UI ----------
+async function initPerfPage() {
+  if (_perfInited) { renderPerfList(); return; }
+  _perfInited = true;
+  showPerfLoading(true);
+  _perfRecords = await dbLoad();
+  showPerfLoading(false);
+  renderPerfList();
+  renderPerfFormFields();
+}
+
+function showPerfLoading(on) {
+  const el = document.getElementById('perfLoadingBar');
+  if (el) el.style.display = on ? 'block' : 'none';
+}
+
+function showToast(msg, type='success') {
+  const t = document.getElementById('perfToast');
+  if (!t) return;
+  t.textContent = msg;
+  t.style.background = type === 'error' ? '#F44336' : '#4CAF50';
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+function renderPerfFormFields() {
+  const role = document.getElementById('pf_role')?.value || 'reception';
+  const weights = PERF_WEIGHTS[role] || [];
+  const editRec = _editingId !== null ? _perfRecords.find(r => r.local_id === _editingId) : null;
+  let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
+  weights.forEach(w => {
+    const val = editRec ? (editRec.scores[w.key] ?? '') : '';
+    html += `<div>
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:3px">
+        ${w.label} <span style="color:#aaa">(权重${(w.weight*100).toFixed(0)}% · ${w.note})</span>
+      </label>
+      <input type="number" min="0" max="100" placeholder="店铺达标率 0-100"
+        id="pf_${w.key}" value="${val}"
+        style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;background:white"
+        oninput="updatePerfPreview()">
+    </div>`;
+  });
+  const adjVal = editRec ? (editRec.scores.adjustment ?? 0) : 0;
+  html += `<div>
+    <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:3px">
+      加减分调整 <span style="color:#aaa">(-10 重大事故 / +10 加分项)</span>
+    </label>
+    <input type="number" min="-20" max="20" placeholder="0"
+      id="pf_adjustment" value="${adjVal}"
+      style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none;background:white"
+      oninput="updatePerfPreview()">
+  </div>`;
+  html += '</div>';
+  const container = document.getElementById('perfFormFields');
+  if (container) { container.innerHTML = html; updatePerfPreview(); }
+}
+
+function updatePerfPreview() {
+  const role = document.getElementById('pf_role')?.value || 'reception';
+  const scores = getFormScores(role);
+  const coef = calcPerfCoef(scores, role);
+  const base = parseFloat(document.getElementById('pf_base')?.value || 1000);
+  const pct = (coef * 100).toFixed(1);
+  const amt = (coef * base).toFixed(0);
+  const color = coef >= 0.9 ? 'var(--pass)' : coef >= 0.7 ? 'var(--warn)' : 'var(--fail)';
+  const el = document.getElementById('perfPreview');
+  if (el) el.innerHTML = `<span style="font-size:22px;font-weight:700;color:${color}">${pct}%</span>
+    <span style="font-size:13px;color:var(--text2);margin-left:8px">→ 实发 ¥${amt}</span>`;
+}
+
+function getFormScores(role) {
+  const weights = PERF_WEIGHTS[role] || [];
+  const scores = {};
+  weights.forEach(w => {
+    const el = document.getElementById('pf_' + w.key);
+    scores[w.key] = el ? parseFloat(el.value || 0) : 0;
+  });
+  scores.adjustment = parseFloat(document.getElementById('pf_adjustment')?.value || 0);
+  return scores;
+}
+
+async function submitPerfForm() {
+  const name = document.getElementById('pf_name')?.value.trim();
+  const month = document.getElementById('pf_month')?.value;
+  const role = document.getElementById('pf_role')?.value;
+  const base = parseFloat(document.getElementById('pf_base')?.value || 1000);
+  const group = document.getElementById('pf_group')?.value.trim() || '';
+  if (!name || !month) { showToast('请填写姓名和月份', 'error'); return; }
+
+  const scores = getFormScores(role);
+  const coef = calcPerfCoef(scores, role);
+
+  const editRec = _editingId !== null ? _perfRecords.find(r => r.local_id === _editingId) : null;
+  const rec = { name, month, role, group, base, scores, coef, db_id: editRec?.db_id || null };
+
+  const btn = document.getElementById('perfSubmitBtn');
+  btn.textContent = '保存中...'; btn.disabled = true;
+
+  const ok = await dbSave(rec);
+  btn.textContent = '保存留档'; btn.disabled = false;
+
+  if (ok) {
+    showToast('✓ 保存成功，数据已同步云端');
+    closePerfForm();
+    showPerfLoading(true);
+    _perfRecords = await dbLoad();
+    showPerfLoading(false);
+    renderPerfList();
+  } else {
+    showToast('保存失败，请检查 Supabase 配置', 'error');
+  }
+}
+
+async function deletePerfRecord(db_id) {
+  if (!confirm('确认删除这条记录？此操作不可撤销。')) return;
+  const ok = await dbDelete(db_id);
+  if (ok) {
+    showToast('已删除');
+    _perfRecords = _perfRecords.filter(r => r.db_id !== db_id);
+    renderPerfList();
+  } else {
+    showToast('删除失败', 'error');
+  }
+}
+
+function editPerfRecord(localId) {
+  _editingId = localId;
+  const rec = _perfRecords.find(r => r.local_id === localId);
+  if (!rec) return;
+  document.getElementById('pf_name').value = rec.name;
+  document.getElementById('pf_month').value = rec.month;
+  document.getElementById('pf_role').value = rec.role;
+  document.getElementById('pf_base').value = rec.base_salary ?? rec.base ?? 1000;
+  document.getElementById('pf_group').value = rec.group_name || rec.group || '';
+  document.getElementById('perfFormWrap').style.display = 'block';
+  renderPerfFormFields();
+  // 回填各指标分数
+  const weights = PERF_WEIGHTS[rec.role] || [];
+  weights.forEach(w => {
+    const el = document.getElementById('pf_' + w.key);
+    if (el && rec.scores) el.value = rec.scores[w.key] ?? '';
+  });
+  const adjEl = document.getElementById('pf_adjustment');
+  if (adjEl && rec.scores) adjEl.value = rec.scores.adjustment ?? 0;
+  updatePerfPreview();
+  document.getElementById('perfFormWrap').scrollIntoView({ behavior: 'smooth' });
+}
+
+function openNewPerfForm() {
+  _editingId = null;
+  document.getElementById('pf_name').value = '';
+  document.getElementById('pf_month').value = '';
+  document.getElementById('pf_role').value = 'reception';
+  document.getElementById('pf_base').value = '1000';
+  document.getElementById('pf_group').value = '';
+  document.getElementById('perfFormWrap').style.display = 'block';
+  renderPerfFormFields();
+}
+
+function closePerfForm() {
+  document.getElementById('perfFormWrap').style.display = 'none';
+  _editingId = null;
+}
+
+function exportPerfCSV() {
+  const mf = document.getElementById('perfMonthFilter')?.value || '';
+  const rf = document.getElementById('perfRoleFilter')?.value || '';
+  let recs = _perfRecords;
+  if (mf) recs = recs.filter(r => r.month === mf);
+  if (rf) recs = recs.filter(r => r.role === rf);
+  if (!recs.length) { showToast('没有可导出的数据', 'error'); return; }
+  const rows = [['月份','姓名','岗位','所属组','绩效基数','绩效系数%','实发绩效(元)']];
+  recs.forEach(r => {
+    const base = r.base_salary ?? r.base ?? 1000;
+    const coef = parseFloat(r.coef || 0);
+    rows.push([r.month, r.name, ROLE_LABELS[r.role]||r.role, r.group_name||r.group||'',
+      base, (coef*100).toFixed(1)+'%', (coef*base).toFixed(0)]);
+  });
+  const csv = '\uFEFF' + rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = `绩效留档_${mf||'全部'}.csv`; a.click();
+}
+
+function renderPerfList() {
+  const mf = document.getElementById('perfMonthFilter')?.value || '';
+  const rf = document.getElementById('perfRoleFilter')?.value || '';
+  let recs = _perfRecords.map((r, i) => ({ ...r, local_id: i }));
+  if (mf) recs = recs.filter(r => r.month === mf);
+  if (rf) recs = recs.filter(r => r.role === rf);
+
+  // 同步给原始记录加 local_id
+  _perfRecords.forEach((r, i) => r.local_id = i);
+
+  // 更新月份筛选器
+  const months = [...new Set(_perfRecords.map(r => r.month))].sort().reverse();
+  const mSel = document.getElementById('perfMonthFilter');
+  if (mSel) {
+    const cur = mSel.value;
+    mSel.innerHTML = '<option value="">全部月份</option>' +
+      months.map(m => `<option value="${m}" ${m===cur?'selected':''}>${m}</option>`).join('');
+  }
+
+  // 统计卡片
+  const totalAmt = recs.reduce((s, r) => s + parseFloat(r.coef||0) * (r.base_salary??r.base??1000), 0);
+  const avgCoef = recs.length ? recs.reduce((s,r) => s + parseFloat(r.coef||0), 0) / recs.length : 0;
+  const el_count = document.getElementById('perfStatCount');
+  const el_avg   = document.getElementById('perfStatAvg');
+  const el_amt   = document.getElementById('perfStatAmt');
+  if (el_count) el_count.textContent = recs.length;
+  if (el_avg)   el_avg.textContent   = (avgCoef*100).toFixed(1) + '%';
+  if (el_amt)   el_amt.textContent   = '¥' + totalAmt.toFixed(0);
+
+  const tbody = document.getElementById('perfArchiveBody');
+  if (!tbody) return;
+  if (!recs.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:32px">暂无留档记录，点击「新增绩效记录」开始录入</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = recs.map(r => {
+    const base = r.base_salary ?? r.base ?? 1000;
+    const coef = parseFloat(r.coef || 0);
+    const pct  = (coef * 100).toFixed(1);
+    const amt  = (coef * base).toFixed(0);
+    const color = coef >= 0.9 ? 'var(--pass)' : coef >= 0.7 ? 'var(--warn)' : 'var(--fail)';
+    // 各指标达标率简要显示
+    const weights = PERF_WEIGHTS[r.role] || [];
+    const detailHtml = weights.map(w => {
+      const v = r.scores ? parseFloat(r.scores[w.key]||0) : 0;
+      const ok = w.key === 'volume' ? v >= 80 : v >= 80;
+      return `<span style="font-size:11px;padding:1px 6px;border-radius:3px;margin:1px;display:inline-block;
+        background:${ok?'#E8F5E9':'#FFEBEE'};color:${ok?'#2E7D32':'#B71C1C'}">${w.label.replace('达标率','').replace('合格率','')}${v}%</span>`;
+    }).join('');
+    return `<tr>
+      <td>${r.month}</td>
+      <td><strong>${r.name}</strong></td>
+      <td><span style="font-size:11px;background:#f0f0f0;padding:2px 8px;border-radius:4px">${ROLE_LABELS[r.role]||r.role}</span></td>
+      <td>${r.group_name||r.group||'-'}</td>
+      <td>¥${base}</td>
+      <td><strong style="color:${color}">${pct}%</strong></td>
+      <td><strong>¥${amt}</strong></td>
+      <td style="max-width:260px">${detailHtml}</td>
+      <td>
+        <button onclick="editPerfRecord(${r.local_id})"
+          style="padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:white;cursor:pointer;font-size:12px;margin-right:4px">编辑</button>
+        <button onclick="deletePerfRecord('${r.id}')"
+          style="padding:3px 10px;border:1px solid #ffcdd2;border-radius:4px;background:#fff8f8;cursor:pointer;font-size:12px;color:var(--fail)">删除</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+</script>
+</body>
+</html>
